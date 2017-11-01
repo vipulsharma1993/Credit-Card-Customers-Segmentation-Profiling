@@ -1,0 +1,182 @@
+#
+########### Final case study 1- Credit card segmentation ##############
+
+ccgeneral <- read.csv("C:\\Users\\ravik\\Dropbox\\Dropbox Work\\Business Analytics\\Final Case Study 1 - Credit Card Segmentation\\CC GENERAL.csv")
+View(ccgeneral)
+
+str(ccgeneral)               
+names(ccgeneral)
+
+############ creating new variables and validating the values.###############
+
+ccgeneral$m_avg_purchase <- ccgeneral$PURCHASES/12
+ccgeneral$m_avg_cash_adamount <- ccgeneral$CASH_ADVANCE/12
+ccgeneral$purchase_type <- as.numeric(ifelse(ccgeneral$INSTALLMENTS_PURCHASES > ccgeneral$ONEOFF_PURCHASES,0,
+                                  ifelse(ccgeneral$INSTALLMENTS_PURCHASES == ccgeneral$ONEOFF_PURCHASES,1,
+                                         ifelse(ccgeneral$INSTALLMENTS_PURCHASES < ccgeneral$ONEOFF_PURCHASES,1,""))))
+
+ccgeneral$avg_amt_per_purchase <- ccgeneral$PURCHASES/ccgeneral$PURCHASES_TRX
+ccgeneral$avg_amt_per_purchase[is.na(ccgeneral$avg_amt_per_purchase)] <- 0
+
+
+ccgeneral$avg_amt_per_purchase[!is.finite(ccgeneral$avg_amt_per_purchase)] <- 0
+
+ccgeneral$avg_cash_advance_amt <- ccgeneral$CASH_ADVANCE/ccgeneral$CASH_ADVANCE_TRX
+ccgeneral$avg_cash_advance_amt[!is.finite(ccgeneral$avg_cash_advance_amt)] <- 0
+
+
+ccgeneral$limit_usage <-ccgeneral$BALANCE/ccgeneral$CREDIT_LIMIT
+ccgeneral$pay_ratio <- ccgeneral$PAYMENTS/ccgeneral$MINIMUM_PAYMENTS
+
+View(ccgeneral)
+
+
+mystats <- function(x) {
+  nmiss<-sum(is.na(x))
+  a <- x[!is.na(x)]
+  m <- mean(a)
+  n <- length(a)
+  s <- sd(a)
+  min <- min(a)
+  pctls<-quantile(a,probs=c(0.01, 0.05,0.1,0.25,0.5,0.75,0.9,0.95,0.99))
+  max <- max(a)
+  return(c(n=n, nmiss=nmiss,  mean=m, stdev=s,min = min, pctls=pctls,max=max))
+}
+
+vars<-c("BALANCE","BALANCE_FREQUENCY",
+        "PURCHASES","ONEOFF_PURCHASES","INSTALLMENTS_PURCHASES",
+        "CASH_ADVANCE","PURCHASES_FREQUENCY","ONEOFF_PURCHASES_FREQUENCY",
+        "PURCHASES_INSTALLMENTS_FREQUENCY","CASH_ADVANCE_FREQUENCY","CASH_ADVANCE_TRX",
+        "PURCHASES_TRX","CREDIT_LIMIT","PAYMENTS",
+        "MINIMUM_PAYMENTS","PRC_FULL_PAYMENT","TENURE",
+        "m_avg_purchase","m_avg_cash_adamount","avg_amt_per_purchase","avg_cash_advance_amt","limit_usage",
+        "pay_ratio")
+
+
+diag_stats<-t(data.frame(apply(ccgeneral[vars], 2, FUN = mystats)))
+
+write.csv(diag_stats, "C:/Users/ravik/Dropbox/Dropbox Work/Business Analytics/Final Case Study 1 - Credit Card Segmentation/diag_stats_ccard.csv")
+
+######### Outlier treatment ############
+
+ccgeneral$BALANCE[ccgeneral$BALANCE>9338.804814]<- 9338.804814
+ccgeneral$PURCHASES[ccgeneral$PURCHASES>8977.29000000001]<- 8977.29000000001
+ccgeneral$ONEOFF_PURCHASES[ccgeneral$ONEOFF_PURCHASES>6689.89820000001]<- 6689.89820000001
+ccgeneral$INSTALLMENTS_PURCHASES[ccgeneral$INSTALLMENTS_PURCHASES>3886.2405]<- 3886.2405
+ccgeneral$CASH_ADVANCE[ccgeneral$CASH_ADVANCE>9588.1633568]<- 9588.1633568
+ccgeneral$CREDIT_LIMIT[ccgeneral$CREDIT_LIMIT>17000]<- 17000
+ccgeneral$PAYMENTS[ccgeneral$PAYMENTS>13608.7155406]<- 13608.7155406
+ccgeneral$MINIMUM_PAYMENTS[ccgeneral$MINIMUM_PAYMENTS>9034.09873695978]<- 9034.09873695978
+ccgeneral$m_avg_purchase[ccgeneral$m_avg_purchase>748.107500000001]<- 748.107500000001
+ccgeneral$m_avg_cash_adamount[ccgeneral$m_avg_cash_adamount>799.013613066667]<- 799.013613066667
+ccgeneral$avg_amt_per_purchase[ccgeneral$avg_amt_per_purchase>756.992100000003]<- 756.992100000003
+ccgeneral$avg_cash_advance_amt[ccgeneral$avg_cash_advance_amt>1909.18342017]<- 1909.18342017
+ccgeneral$limit_usage[ccgeneral$limit_usage == "Inf"]<- 0
+ccgeneral$pay_ratio[ccgeneral$pay_ratio == "inf"]<- 0
+
+View(ccgeneral)
+####### prepare final data #########
+final_data<- ccgeneral
+
+######## scaling  ##########
+final_data <- scale(ccgeneral[,c("BALANCE","BALANCE_FREQUENCY",
+                           "PURCHASES","ONEOFF_PURCHASES","INSTALLMENTS_PURCHASES",
+                           "CASH_ADVANCE","PURCHASES_FREQUENCY","ONEOFF_PURCHASES_FREQUENCY",
+                           "PURCHASES_INSTALLMENTS_FREQUENCY","CASH_ADVANCE_FREQUENCY","CASH_ADVANCE_TRX",
+                           "PURCHASES_TRX","CREDIT_LIMIT","PAYMENTS",
+                           "MINIMUM_PAYMENTS","PRC_FULL_PAYMENT","TENURE")])
+View(final_data)
+
+## FACTOR ANALYSIS 
+corrm<- cor(final_data)                                 ### CORRELATION MATRIX
+
+require(psych)
+require(GPArotation)
+
+### DECIDING NUMBER OF FACTORS USING SCREE PLOT & EIGEN VALUES OVER 1
+
+scree(corrm, factors=T, pc=T, main="scree plot", hline=NULL, add=FALSE) ### SCREE PLOT
+
+eigen(corrm)$values                                                     ### EIGEN VALUES
+
+require(dplyr)
+eigen_values <- mutate(data.frame(eigen(corrm)$values)
+                       ,cum_sum_eigen=cumsum(eigen.corrm..values)
+                       , pct_var=eigen.corrm..values/sum(eigen.corrm..values)
+                       , cum_pct_var=cum_sum_eigen/sum(eigen.corrm..values))  # CALCULATING VARIANCE 
+
+write.csv(eigen_values, "C:\\Users\\ravik\\Dropbox\\Dropbox Work\\Business Analytics\\Final Case Study 1 - Credit Card Segmentation\\ccgen_EigenValues1.csv")  ### EXPORTING EIGEN VALUE SUMMARY
+
+FA<-fa(r=corrm, 5, rotate="varimax", fm="ml")               ### CONDUCTING FACTOR ANALYSIS
+print(FA)                                                    ### PRINT THE RESULTS
+FA_SORT<-fa.sort(FA)                                         ### Reordering
+ls(FA_SORT)                                                  ### LISTING OUT THE OBJECTS
+FA_SORT$loadings
+#FA_SORT$e.values                                            ### FINDING EIGEN VALUES FROM THE RESULTS
+Loadings <- data.frame(FA_SORT$loadings[1:ncol(ccgeneral),]) ### CAPTURING ONLY LOADINGS INTO DATA FRAME
+
+write.csv(Loadings, "C:\\Users\\ravik\\Dropbox\\Dropbox Work\\Business Analytics\\Final Case Study 1 - Credit Card Segmentation\\loadings.csv") ### SAVING THE FILE
+
+#Prepare final Data
+
+#standardizing the data
+
+final_data = scale(final_data)
+
+#View(final_data)
+#building clusters using k-means clustering 
+
+cluster_three <- kmeans(final_data,3)
+cluster_four <- kmeans(final_data,4)
+cluster_five <- kmeans(final_data,5)
+cluster_six <- kmeans(final_data,6)
+
+cluster_three$cluster
+
+
+clust_data1<-cbind(final_data,km_clust_3=cluster_three$cluster,km_clust_4=cluster_four$cluster,km_clust_5=cluster_five$cluster ,km_clust_6=cluster_six$cluster   )
+#View(clust_data1)
+clust_data11 <- clust_data1
+#Graph based on k-means - Optional
+require(cluster)
+
+clusplot(final_data, #dataframe
+         cluster_five$cluster, #clusterdata
+         color = TRUE, #color
+         #shade = TRUE, # Lines in clusters
+         lines =6, # lines connecting centroids
+         labels = 2 # Labels clusters and cases
+)
+
+###Profiling
+
+#Converting into factors
+clust_data1[,"km_clust_3"]=factor(clust_data1[,"km_clust_3"])
+clust_data1[,"km_clust_4"]=factor(clust_data1[,"km_clust_4"])
+clust_data1[,"km_clust_5"]=factor(clust_data1[,"km_clust_5"])
+clust_data1[,"km_clust_6"]=factor(clust_data1[,"km_clust_6"])
+
+clust_data1 <- data.frame(clust_data1)
+
+require(tables)
+
+profiling <- tabular(1+BALANCE+BALANCE_FREQUENCY+PURCHASES+ONEOFF_PURCHASES+INSTALLMENTS_PURCHASES+
+                   CASH_ADVANCE+PURCHASES_FREQUENCY+ONEOFF_PURCHASES_FREQUENCY+
+                   PURCHASES_INSTALLMENTS_FREQUENCY+CASH_ADVANCE_FREQUENCY+
+                   CASH_ADVANCE_TRX+PURCHASES_TRX+CREDIT_LIMIT+
+                   PAYMENTS+MINIMUM_PAYMENTS+PRC_FULL_PAYMENT+TENURE ~ mean+(mean*km_clust_3)+(mean*km_clust_4)+(mean*km_clust_5)+(mean*km_clust_6), data=clust_data1 )
+
+profile1<-as.matrix(profiling)
+profile1<-data.frame(profile1)
+View(profile1)
+
+profile<-tabular(1~length+(length*km_clust_3)+(length*km_clust_4)+(length*km_clust_5)+(length*km_clust_6),
+                 data=clust_data1)
+profile2<-as.matrix(profile)
+profile2<-data.frame(profile2)
+View(profile2)
+
+write.csv(profile1,"profile1.csv",row.names = F)
+write.csv(profile2,"profile2.csv",row.names = F)
+
+#############################END OF Case study############################

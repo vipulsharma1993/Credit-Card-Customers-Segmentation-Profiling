@@ -1,0 +1,213 @@
+libname study "/folders/myfolders/Final Case Study 1 - Credit Card Segmentation";
+
+proc import datafile="/folders/myfolders/Final Case Study 1 - Credit Card Segmentation/CC GENERAL.csv" 
+dbms=csv out=study.Creditcase replace;
+guessingrows=max; run; 
+
+/* Data Exploration */
+
+Proc contents data=study.creditcase varnum;
+run;
+
+/* Advanced data prepration */
+
+data study.creditcase;
+set study.creditcase;
+Mnth_avg_pur = PURCHASES/(PURCHASES_FREQUENCY*TENURE);
+Avg_cash_adv = CASH_ADVANCE / CASH_ADVANCE_TRX;
+Bal_To_limit = BALANCE/CREDIT_LIMIT;
+Pay_by_min   = PAYMENTS/MINIMUM_PAYMENTS;
+run;
+
+/* Outlier Treatment */ 
+proc means data=study.creditcase n nmiss mean std min max p95 P99;
+run;
+
+
+data study.creditcase3;
+set study.creditcase1;
+if BALANCE >7809.06 Then BALANCE =  7809.06 ;
+if BALANCE_FREQUENCY >1.5879827 Then BALANCE_FREQUENCY =  1.5879827 ;
+if PURCHASES >7413.09 Then PURCHASES =  7413.09 ;
+if ONEOFF_PURCHASES >5572.1073709 Then ONEOFF_PURCHASES =  5572.1073709 ;
+if INSTALLMENTS_PURCHASES >3124.0819903 Then INSTALLMENTS_PURCHASES =  3124.0819903 ;
+if CASH_ADVANCE >7270.3511125 Then CASH_ADVANCE =  7270.3511125 ;
+if PURCHASES_FREQUENCY >1.6944626 Then PURCHASES_FREQUENCY =  1.6944626 ;
+if ONEOFF_PURCHASES_FREQUENCY >1.097466 Then ONEOFF_PURCHASES_FREQUENCY =  1.097466 ;
+if PURCHASES_INSTALLMENTS_FREQUENCY >1.5567807 Then PURCHASES_INSTALLMENTS_FREQUENCY =  1.5567807 ;
+if CASH_ADVANCE_FREQUENCY >0.7355084 Then CASH_ADVANCE_FREQUENCY =  0.7355084 ;
+if CASH_ADVANCE_TRX >23.7227669 Then CASH_ADVANCE_TRX =  23.7227669 ;
+if PURCHASES_TRX >89.2827797 Then PURCHASES_TRX =  89.2827797 ;
+if CREDIT_LIMIT >15410.91 Then CREDIT_LIMIT =  15410.91 ;
+if PAYMENTS >10418.32 Then PAYMENTS =  10418.32 ;
+if MINIMUM_PAYMENTS >7981.5565423 Then MINIMUM_PAYMENTS =  7981.5565423 ;
+if PRC_FULL_PAYMENT >1.0312122 Then PRC_FULL_PAYMENT =  1.0312122 ;
+if TENURE >15.5323108 Then TENURE =  15.5323108 ;
+run;
+
+/*************** MISSING VALUE TREATMENT *********************/
+
+data study.creditcase3;
+set study.creditcase3;
+if Mnth_avg_pur=. then Mnth_avg_pur = 0;
+if Avg_cash_adv=. then Avg_cash_adv=0;
+if Bal_To_limit=. then Bal_To_limit=0;
+if Pay_by_min=. then Pay_by_min=0;
+run;
+
+/* Factor Analysis */
+
+proc factor data=study.creditcase3 method=principal 
+mineigen=0 nfactors=5 scree rotate= varimax reorder;
+var 
+BALANCE
+BALANCE_FREQUENCY
+PURCHASES
+ONEOFF_PURCHASES
+INSTALLMENTS_PURCHASES
+CASH_ADVANCE
+PURCHASES_FREQUENCY
+ONEOFF_PURCHASES_FREQUENCY
+PURCHASES_INSTALLMENTS_FREQUENCY
+CASH_ADVANCE_FREQUENCY
+CASH_ADVANCE_TRX
+PURCHASES_TRX
+CREDIT_LIMIT
+PAYMENTS
+MINIMUM_PAYMENTS
+PRC_FULL_PAYMENT
+TENURE;
+run;
+
+/*  VARIABLE STANDARDIZATION */
+
+/*i've not created copy of variables explicitly,*/
+
+
+proc standard data=study.creditcase3 out=study.creditcase3 mean=0 std=1;
+var 
+ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY;
+run;
+
+/*  Clustering  */
+
+proc fastclus data=study.creditcase3 out=clusterdata cluster=cluster3 maxclusters=3 maxiter=100;
+var
+ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY;
+run;
+
+
+proc fastclus data=clusterdata out=clusterdata cluster=cluster4 maxclusters=4 maxiter=100;
+	var
+ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY;
+run;
+
+
+proc fastclus data=clusterdata out=clusterdata cluster=cluster5 maxclusters=5 maxiter=100;
+var
+ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY;
+run;
+
+
+
+proc fastclus data=clusterdata out=clusterdata cluster=cluster6 maxclusters=6 maxiter=100;
+var
+ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY;
+run;
+
+/* cluster size check*/
+
+proc freq data=work.clusterdata;
+tables cluster3 cluster4 cluster5 cluster6;
+run;
+
+/* after looking at the Frequency-Percent of clusters, i've selected cluster6*/
+
+                 /** Profiling **/
+
+proc tabulate data=clusterdata;
+ var ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY;
+
+class cluster3 cluster4 cluster5 cluster6;
+
+table (ONEOFF_PURCHASES
+PURCHASES
+PAYMENTS 
+CASH_ADVANCE_TRX
+CASH_ADVANCE
+BALANCE
+PURCHASES_INSTALLMENTS_FREQUENCY
+PURCHASES_FREQUENCY
+PRC_FULL_PAYMENT
+TENURE
+CREDIT_LIMIT
+BALANCE_FREQUENCY)*mean, cluster3 cluster4 cluster5 cluster6 ALL;
+run;
+
+/************* END *****************/
